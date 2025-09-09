@@ -27,3 +27,22 @@ in gtk_demo wlr-randr is used to rotate the display output itself
 root contains user authentication required by cage, the filename is the username  
 debian/cage@.service is responsible for launching the GUI  
 debian/gocontroll_demo.service is responsible for launching the demo simulink application  
+
+## Points of note
+
+This demo uses the pyuio package to read and write the Simulink models virtual memory.  
+It is however not entirely recommended, this approach has two downsides:  
+
+1. The GUI now has to run under the root user for the correct permissions  
+2. Read and write access is not synchronized  
+
+However it also has some advantages:
+
+1. No need to set up your own IPC protocol
+2. Infrastructure is present by default in Simulink
+
+When using Crank Storyboard, there is a companion [Simulink blockset](https://github.com/GOcontroll/GOcontroll-Simulink-Crank-Storyboard) to provide the IPC.  
+However this toolkit requires a paid license to use.
+
+This application is in no means a display of best practices but merely a demonstration of  
+an application running in a wayland compositor and how that is done.
