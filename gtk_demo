@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+import json
+import logging
+import subprocess
+import threading
+import time
+from logging.handlers import RotatingFileHandler
+
+import gi
+import pyuio
+
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gtk
+
+logger = logging.getLogger(__name__)
+
+thread_running = True
+
+def setup_logging():
+    # Create a logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Set the logging level
+
+    # Format for log messages
+    formatter = logging.Formatter(
+        "%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+    )
+
+    # Create a console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    try:
+        # Create a rotating file handler
+        file_handler = RotatingFileHandler(
+            "/var/log/gocontroll_demo.log", maxBytes=5 * 1024 * 1024, backupCount=3
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except PermissionError:
+        logger.warning(
+            "Unable to open /var/log/gocontroll_demo.log due to insufficient permissions, only logging to console"
+        )
+
+
+def change_brightness(scale, param, pid):
+    value = int(scale.get_value())
+    param.process_write(pid, value)
+
+
+def monitor_voltages(k30, k15, pid):
+    global thread_running
+    while thread_running:
+        mv = k30["elem"].process_read(pid)
+        k30["widget"].set_label(f"K30: {mv}mV")
+        mv = k15["elem"].process_read(pid)
+        k15["widget"].set_label(f"K15: {mv}mV")
+        time.sleep(0.5)
+
+def exit_demo(btn, win):
+    global thread_running
+    thread_running=False
+    win.close()
+
+def on_activate(app):
+    try:
+        out = subprocess.run(
+            ["pidof", "gocontroll_demo"], check=True, capture_output=True
+        )
+        pid = int(out.stdout.decode("utf-8"))
+    except subprocess.CalledProcessError as ex:
+        logger.error("Could not get pid of simulink model")
+        raise ex
+    with open("/usr/share/go-gtk-demo/signals.json", "r") as signals_json:
+        signals = json.load(signals_json)
+    with open("/usr/share/go-gtk-demo/parameters.json", "r") as parameters_json:
+        params = json.load(parameters_json)
+    k15_elem = pyuio.asap_element(signals["k15"]["address"], signals["k15"]["type"])
+    k30_elem = pyuio.asap_element(signals["k30"]["address"], signals["k30"]["type"])
+    brightness_elem = pyuio.asap_element(
+        params["DisplayBrightness"]["address"], params["DisplayBrightness"]["type"]
+    )
+    win = Gtk.ApplicationWindow(application=app)
+    win.set_default_size(1280, 720)
+    win.set_decorated(False)
+    layout = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+    layout.set_valign(Gtk.Align.CENTER)
+    layout.set_margin_start(200)
+    layout.set_margin_end(200)
+    hlayout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+    hlayout.set_homogeneous(True)
+    k30 = Gtk.Label(label="K30: -mV")
+    k15 = Gtk.Label(label="K15: -mV")
+    hlayout.append(k30)
+    hlayout.append(k15)
+    logo = Gtk.Picture.new_for_filename("/usr/share/go-gtk-demo/GOcontroll.png")
+    btn = Gtk.Button(label="Exit demo")
+    btn.connect('clicked', exit_demo, win)
+    btn.set_margin_start(200)
+    btn.set_margin_end(200)
+    text_slider = Gtk.Label(label="Display brightness")
+    text_slider.set_justify(Gtk.Justification.CENTER)
+    brightness = 50
+    try:
+        with open("/sys/class/backlight/max25014/brightness", "r") as brightness_file:
+            brightness = int(brightness_file.read())
+    except FileNotFoundError:
+        logger.error("Could not get current brightness")
+
+    slider = Gtk.Scale(
+        orientation=Gtk.Orientation.HORIZONTAL,
+        adjustment=Gtk.Adjustment(
+            value=brightness, lower=10, upper=100, step_increment=1
+        ),
+    )
+    slider.set_draw_value(True)
+    slider.set_digits(0)
+    slider.connect("value_changed", change_brightness, brightness_elem, pid)
+    text = Gtk.Label(
+        label="GOcontroll Moduline Display GTK demo\nhttps://github.com/GOcontroll/go-gtk-demo\n\nDefault Users: root:root (no ssh) GOcontroll:Moduline"
+    )
+    text.set_justify(Gtk.Justification.CENTER)
+    layout.append(logo)
+    layout.append(hlayout)
+    layout.append(text_slider)
+    layout.append(slider)
+    layout.append(text)
+    layout.append(btn)
+    win.set_child(layout)
+    win.present()
+    t = threading.Thread(
+        target=monitor_voltages,
+        args=(
+            {"elem": k30_elem, "widget": k30},
+            {"elem": k15_elem, "widget": k15},
+            pid,
+        ),
+    )
+    t.start()
+
+
+setup_logging()
+logger.info("starting GOcontroll GTK demo")
+#rotate the display output, touch input is rotated by udev rule
+out = subprocess.run(["wlr-randr", "--output", "LVDS-1", "--transform", "180"],capture_output=True)
+logger.info(out)
+app = Gtk.Application(application_id="org.GOcontroll.Example")
+app.connect("activate", on_activate)
+app.run(None)

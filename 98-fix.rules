@@ -1,0 +1,1 @@
+ATTRS{name}=="cyttsp6_mt",ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"

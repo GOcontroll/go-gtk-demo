@@ -1,0 +1,9 @@
+*_generated_code/
+slprj/
+*.a2l
+*.elf
+*.json
+debian/.debhelper/
+debian/go-gtk-demo*
+debian/debhelper-build-stamp
+debian/files

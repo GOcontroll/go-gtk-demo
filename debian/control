@@ -1,0 +1,24 @@
+Source: go-gtk-demo
+Section: Misc
+Priority: optional
+Maintainer: Maud Spierings <maudspierings@gocontroll.com>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+Standards-Version: 4.7.2
+Homepage: https://gocontroll.com
+Vcs-Browser: https://github.com/GOcontroll/go-gtk-demo
+Vcs-Git: https://github.com/GOcontroll/go-gtk-demo.git
+
+Package: go-gtk-demo
+Architecture: any
+Depends:
+ kbd,
+ wlr-randr,
+ cage,
+ gir1.2-gtk-4.0,
+ python3-pyuio,
+ python3-gi,
+ ${shlibs:Depends},
+ ${misc:Depends},
+Description: A GTK demo for the Moduline Display
