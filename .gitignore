@@ -3,6 +3,7 @@ slprj/
 *.a2l
 *.elf
 *.json
+*.slxc
 debian/.debhelper/
 debian/go-gtk-demo*
 debian/debhelper-build-stamp
